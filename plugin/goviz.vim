@@ -18,7 +18,15 @@ endif
 
 function! s:GovizPreview(...)
     if !exists('s:goviz_daemon')
-        let s:goviz_daemon = jobstart([s:goviz_bin, '-p', g:goviz_port, 'start'])
+        let l:daemonargs = [s:goviz_bin, '-p', g:goviz_port, 'start']
+        if has('nvim')
+            let s:goviz_daemon = jobstart(l:daemonargs)
+        elseif v:version >= 800
+            let s:goviz_daemon = job_start(l:daemonargs)
+        else
+            call add(l:daemonargs, '&')
+            call system(join(l:daemonargs, ' '))
+        endif
     endif
 
     if !exists('b:previewing')
@@ -33,14 +41,24 @@ function! s:GovizPreview(...)
         call add(l:args, '-l')
     endif
     call add(l:args, 'send')
-    let l:job = jobstart(l:args)
-    call jobsend(l:job, l:content)
-    call jobclose(l:job, 'stdin')
+
+    if has('nvim')
+        let l:job = jobstart(l:args)
+        call jobsend(l:job, l:content)
+        call jobclose(l:job, 'stdin')
+    else
+        call add(l:args, '&')
+        call system(join(l:args, ' '), l:content)
+    endif
 endfunction
 
 function! s:GovizKill()
     if exists('s:goviz_daemon')
-        jobclose(s:goviz_daemon)
+        if has('nvim')
+            jobclose(s:goviz_daemon)
+        elseif v:version >= 800
+            call job_stop(s:goviz_daemon)
+        endif
     else
         let l:job = jobstart([s:goviz_bin, '-p', g:goviz_port, "shutdown"])
         call jobwait(l:job)
